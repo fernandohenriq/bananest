@@ -1,3 +1,5 @@
-import { mainModule } from './modules/main.module';
+import { MainModule } from './modules/main.module';
 
-mainModule.start(3000);
+const mainModule = new MainModule();
+
+mainModule.init().start(3000);
