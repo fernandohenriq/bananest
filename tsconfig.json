@@ -14,6 +14,6 @@
     "emitDecoratorMetadata": true,
     "sourceMap": true
   },
-  "include": ["./src/**/*", "package.json"],
+  "include": ["./src/**/*", "package.json", "src/__tests__/setup-file.ts"],
   "exclude": ["node_modules", "dist"]
 }
