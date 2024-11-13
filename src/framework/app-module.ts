@@ -10,7 +10,7 @@ export class AppModule {
   private basePath: string;
   private router: Router;
   private container: AppContainer;
-  private app = express();
+  public app = express();
 
   constructor(config: {
     basePath?: string;
@@ -50,15 +50,12 @@ export class AppModule {
   private setupControllers(controllers: any[]) {
     controllers.forEach((controller) => {
       this.container.register(controller.name, controller);
-
       const instance = this.container.resolve(controller);
       const prototype = Object.getPrototypeOf(instance);
       const prefix = Reflect.getMetadata('prefix', controller) || '';
-
       const methodNames = Object.getOwnPropertyNames(prototype).filter(
         (name) => name !== 'constructor' && typeof prototype[name] === 'function',
       );
-
       methodNames.forEach((methodName) => {
         const route = Reflect.getMetadata('route', prototype, methodName);
         if (route) {
@@ -77,6 +74,28 @@ export class AppModule {
     });
   }
 
+  init() {
+    this.app.use(express.json());
+    this.app.use(this.basePath, this.router);
+    // route not found
+    this.app.use((req: any, res: any, next: any) => {
+      res.status(404).json({
+        message: 'Route not found',
+        path: req.path,
+      });
+    });
+    // error handler
+    this.app.use((err: any, req: any, res: any, next: any) => {
+      res.status(500).json({
+        message: err.message,
+        path: req.path,
+        stack: err.stack,
+        body: JSON.stringify(err, null, 2),
+      });
+    });
+    return this;
+  }
+
   import(module: AppModule) {
     const { basePath, router, container } = module.export();
     this.container.import(container);
@@ -91,10 +110,15 @@ export class AppModule {
     };
   }
 
-  start(port: number = 80) {
-    this.app.use(express.json());
-    this.app.use(this.basePath, this.router);
+  getApp() {
+    return this.app;
+  }
 
+  close() {
+    process.exit(0);
+  }
+
+  start(port: number = 3000) {
     this.app.listen(port, () => {
       console.info(`[APP-MODULE] Server is on http://localhost:${port}`);
     });
