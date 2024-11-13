@@ -1,6 +1,6 @@
 {
-  "name": "api",
-  "version": "1.0.0",
+  "name": "bananest",
+  "version": "0.1.0",
   "main": "src/index.js",
   "author": "fernandohenriqsilva@gmail.com",
   "license": "MIT",
