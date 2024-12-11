@@ -1,0 +1,28 @@
+{
+  "name": "@bananest/core",
+  "version": "0.1.0",
+  "description": "A lightweight dependency injection framework inspired by NestJS",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "author": "fernandohenriqsilva@gmail.com",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "yarn build"
+  },
+  "peerDependencies": {
+    "express": "^4.21.0",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "@types/express": "^4.17.21"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
