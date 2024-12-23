@@ -1,5 +1,3 @@
-import { MainModule } from './modules/main.module';
-
-const mainModule = new MainModule();
-
-mainModule.init().start(3000);
+export * from './app-container';
+export * from './app-decorators';
+export * from './app-module';
