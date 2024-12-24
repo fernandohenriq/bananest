@@ -1,6 +1,11 @@
 # 🐱🍌 BanaNest
 
-A lightweight dependency injection framework inspired by NestJS for learning purposes!
+BanaNest is a lightweight dependency injection framework inspired by NestJS started as an educational project to understand modern framework architectures, but aims to evolve into a lightweight alternative for applications that need:
+
+- A simplified dependency injection system
+- Clean architectural patterns
+- Type-safe decorators
+- Modular structure without the overhead of larger frameworks
 
 <!--
 <p align="center">
@@ -27,9 +32,9 @@ This project is a study implementation that recreates core functionalities found
 
 ### Decorators
 
-- `@Inject(token or class)` for dependency injection
-- `@Controller(prefix)` for routing
-- `@Get(path)`, `@Post(path)`, `@Put(path)`, `@Delete(path)`, `@Patch(path)` for HTTP methods
+- Dependency injection: `@Inject(token or class)`
+- Routing: `@Controller(prefix)`
+- HTTP methods: `@Get(path)`, `@Post(path)`, `@Put(path)`, `@Delete(path)`, `@Patch(path)`
 
 ### Modular Architecture
 
@@ -54,12 +59,16 @@ This project is a study implementation that recreates core functionalities found
 - Vitest for testing
 - Express.js (as underlying HTTP server)
 
+## 🤝 Contributing
+
+While BanaNest started as a learning project, we welcome contributions! Whether you're fixing bugs, adding features, or improving documentation.
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
-- Inspired by NestJS framework
-- Built for educational purposes to understand DI and decorators
-- Special thanks to Bananinha the cat for the name inspiration! 🐱
+- Inspired by NestJS architecture and patterns
+- Built with both learning and practical usage in mind
+- Named after Bananinha the cat! 🐱
