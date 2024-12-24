@@ -1,5 +1,3 @@
-import 'reflect-metadata';
-
 export function Inject(token: string | { new (...args: any[]): {} }) {
   return function (target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
     const key = propertyKey || 'constructor';
