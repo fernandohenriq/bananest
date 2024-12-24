@@ -40,14 +40,11 @@ This project is a study implementation that recreates core functionalities found
 ## 🚀 Getting Started
 
 ```bash
-# Install dependencies
-`yarn install`
+# With npm
+`npm install bananest`
 
-# Run development server
-`yarn dev`
-
-# Run tests
-`yarn test`
+# With yarn
+`yarn add bananest`
 ```
 
 ## 🔧 Technical Stack
