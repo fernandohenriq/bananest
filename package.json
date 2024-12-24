@@ -5,8 +5,17 @@
   "author": "fernandohenriqsilva@gmail.com",
   "license": "MIT",
   "private": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./build/index.js",
+      "require": "./build/index.cjs"
+    }
+  },
   "scripts": {
-    "test": "vitest --config vitest.config.mts"
+    "build": "tsc",
+    "test": "vitest --config vitest.config.mts",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.1",

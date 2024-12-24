@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "commonjs",
+    "module": "ESNext",
     "rootDir": "./src",
     "outDir": "./build",
     "allowJs": true,
@@ -12,7 +12,8 @@
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "moduleResolution": "node"
   },
   "include": ["./src/**/*", "package.json", "src/__tests__/setup-file.ts"],
   "exclude": ["node_modules", "dist"]
