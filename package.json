@@ -1,6 +1,6 @@
 {
   "name": "bananest",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "main": "src/index.ts",
   "author": "fernandohenriqsilva@gmail.com",
   "license": "MIT",
@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup src/index.ts --outDir build --format esm,cjs --dts",
     "test": "vitest --config vitest.config.mts",
     "prepare": "npm run build"
   },
@@ -37,6 +37,7 @@
     "prettier": "^3.3.3",
     "supertest": "^7.0.0",
     "ts-node-dev": "^2.0.0",
+    "tsup": "^8.3.5",
     "typescript": "^5.6.2",
     "vitest": "^2.1.1"
   }
