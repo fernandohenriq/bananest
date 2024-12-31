@@ -11,6 +11,8 @@ export class AppModule {
   private container: AppContainer;
   public app = express();
 
+  private initialized = false;
+
   constructor(config: {
     basePath?: string;
     imports?: AppModule[];
@@ -92,6 +94,7 @@ export class AppModule {
         body: JSON.stringify(err, null, 2),
       });
     });
+    this.initialized = true;
     return this;
   }
 
@@ -114,10 +117,12 @@ export class AppModule {
   }
 
   close() {
+    this.initialized = false;
     process.exit(0);
   }
 
   start(port: number = 3000) {
+    if (!this.initialized) this.init();
     this.app.listen(port, () => {
       console.info(`[APP-MODULE] Server is on http://localhost:${port}`);
     });
