@@ -1,6 +1,7 @@
-import express, { Router } from 'express';
+import express, { Request as ExpressRequest, Response as ExpressResponse, Router } from 'express';
 
 import { AppContainer } from './app-container';
+import { HttpContext, HttpRequest, HttpResponse } from './app-interfaces';
 
 export type Provider = { new (...args: any[]): any };
 export type ProviderConfig = { token: string; value: Provider };
@@ -65,7 +66,8 @@ export class AppModule {
           const fullPath = `${prefix}${path}`.replace(/\/+/g, '/');
           this.router[method](fullPath, (req, res, next) => {
             try {
-              return (instance as any)[methodName](req, res, next);
+              const httpContext: HttpContext<ExpressRequest, ExpressResponse> = { req, res };
+              (instance as any)[methodName](httpContext);
             } catch (error) {
               next(error);
             }
