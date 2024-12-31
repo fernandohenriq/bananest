@@ -1,6 +1,6 @@
 {
   "name": "bananest",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "author": "fernandohenriqsilva@gmail.com",
   "license": "MIT",
   "main": "./build/index.cjs",
