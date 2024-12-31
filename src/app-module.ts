@@ -2,8 +2,8 @@ import express, { Router } from 'express';
 
 import { AppContainer } from './app-container';
 
-type IProvider = { new (...args: any[]): any };
-type IProviderConfig = { token: string; value: IProvider };
+export type Provider = { new (...args: any[]): any };
+export type ProviderConfig = { token: string; value: Provider };
 
 export class AppModule {
   private basePath: string;
@@ -17,7 +17,7 @@ export class AppModule {
     basePath?: string;
     imports?: AppModule[];
     controllers?: any[];
-    providers?: (IProvider | IProviderConfig)[];
+    providers?: (Provider | ProviderConfig)[];
   }) {
     this.basePath = config.basePath ?? '/';
     this.router = Router();
