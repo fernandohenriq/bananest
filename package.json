@@ -1,19 +1,26 @@
 {
   "name": "bananest",
-  "version": "0.2.2",
-  "main": "src/index.ts",
+  "version": "0.2.3",
   "author": "fernandohenriqsilva@gmail.com",
   "license": "MIT",
-  "private": false,
+  "main": "./build/index.cjs",
+  "module": "./build/index.js",
+  "types": "./build/index.d.ts",
   "type": "module",
+  "private": false,
+  "files": [
+    "build"
+  ],
   "exports": {
     ".": {
+      "types": "./build/index.d.ts",
       "import": "./build/index.js",
       "require": "./build/index.cjs"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --outDir build --format esm,cjs --dts",
+    "clean": "rm -rf build",
+    "build": "npm run clean && tsup src/index.ts --outDir build --format esm,cjs --dts",
     "test": "vitest --config vitest.config.mts",
     "prepare": "npm run build"
   },
