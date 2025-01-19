@@ -91,12 +91,13 @@ export class AppModule {
       const methodNames = Object.getOwnPropertyNames(prototype).filter(
         (name) => name !== 'constructor' && typeof prototype[name] === 'function',
       );
+      const middlewares: ((...args: any[]) => void)[] = [];
       methodNames.forEach((methodName) => {
         const middleware = Reflect.getMetadata('middleware', prototype, methodName);
         if (middleware) {
           const { includeErr = false } = middleware;
           if (includeErr) {
-            this.router['use']((err: any, req: any, res: any, next: any) => {
+            middlewares.push((err: any, req: any, res: any, next: any) => {
               try {
                 const httpContext: HttpMiddlewareContext = { err, req, res, next };
                 (instance as any)[methodName](httpContext);
@@ -105,7 +106,7 @@ export class AppModule {
               }
             });
           } else {
-            this.router['use']((req, res, next) => {
+            middlewares.push((req: any, res: any, next: any) => {
               try {
                 const httpContext: HttpMiddlewareContext = { req, res, next };
                 (instance as any)[methodName](httpContext);
@@ -114,7 +115,6 @@ export class AppModule {
               }
             });
           }
-          return;
         }
       });
       methodNames.forEach((methodName) => {
@@ -123,7 +123,7 @@ export class AppModule {
           const path = route.path as string;
           const method = route.method as 'get' | 'post' | 'put' | 'delete' | 'patch';
           const fullPath = `${prefix}${path}`.replace(/\/+/g, '/');
-          this.router[method](fullPath, (req, res, next) => {
+          this.router[method](fullPath, middlewares, (req: any, res: any, next: any) => {
             try {
               const httpContext: HttpContext<ExpressRequest, ExpressResponse> = { req, res, next };
               (instance as any)[methodName](httpContext);
