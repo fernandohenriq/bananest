@@ -13,7 +13,19 @@ export type HttpResponse<T = object> = T & {
   send: <U = any>(body: U) => void;
 };
 
-export type HttpContext<T = object, U = object> = {
+export type HttpNext<E = unknown> = (err?: E) => void;
+
+export type HttpError<E = unknown> = E;
+
+export type HttpContext<T = object, U = object, E = unknown> = {
   req: HttpRequest<T>;
   res: HttpResponse<U>;
+  next?: HttpNext<E>;
+};
+
+export type HttpMiddlewareContext<T = object, U = object, E = unknown> = {
+  req: HttpRequest<T>;
+  res: HttpResponse<U>;
+  err?: HttpError<E>;
+  next?: HttpNext<E>;
 };

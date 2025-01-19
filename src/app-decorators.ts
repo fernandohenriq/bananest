@@ -1,3 +1,5 @@
+import { HttpMiddlewareContext } from './app-interfaces';
+
 export function Inject(token: string | { new (...args: any[]): {} }) {
   return function (target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
     const key = propertyKey || 'constructor';
@@ -11,6 +13,24 @@ export function Inject(token: string | { new (...args: any[]): {} }) {
 export function Controller(prefix: string = '/') {
   return function (constructor: Function) {
     Reflect.defineMetadata('prefix', prefix, constructor);
+  };
+}
+
+export function Middleware() {
+  return function (
+    target: HttpMiddlewareContext,
+    propertyKey: string,
+    descriptor: PropertyDescriptor,
+  ) {
+    let includeErr = false;
+    const originalMethod = descriptor.value;
+    descriptor.value = function (args: HttpMiddlewareContext) {
+      includeErr = !!args?.err;
+      const result = originalMethod.apply(this, args);
+      return result;
+    };
+    Reflect.defineMetadata('middleware', true, target, propertyKey);
+    Reflect.defineMetadata('middleware_include_err', true, target, propertyKey);
   };
 }
 
