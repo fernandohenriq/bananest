@@ -68,9 +68,9 @@ export class AppModule {
   }
 
   setMiddlewares(middlewares: any[]) {
-    middlewares.forEach((middlewares) => {
-      this.container.register(middlewares.name, middlewares);
-      const instance = this.container.resolve(middlewares);
+    middlewares.forEach((middleware) => {
+      this.container.register(middleware.name, middleware);
+      const instance = this.container.resolve(middleware);
       const prototype = Object.getPrototypeOf(instance);
       const methodNames = Object.getOwnPropertyNames(prototype).filter(
         (name) => name !== 'constructor' && typeof prototype[name] === 'function',
@@ -93,7 +93,7 @@ export class AppModule {
             return;
           }
           if (includeErr) {
-            middlewares.push((err: any, req: any, res: any, next: any) => {
+            this.router['use']((err: any, req: any, res: any, next: any) => {
               try {
                 (instance as any)[methodName]({ err, req, res, next });
               } catch (error) {
@@ -102,7 +102,7 @@ export class AppModule {
             });
             return;
           }
-          middlewares.push((req: any, res: any, next: any) => {
+          this.router['use']((req: any, res: any, next: any) => {
             try {
               const httpContext: HttpMiddlewareContext = { req, res, next };
               (instance as any)[methodName](httpContext);
