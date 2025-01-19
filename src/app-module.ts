@@ -10,7 +10,8 @@ import { HttpContext, HttpMiddlewareContext, HttpRequest, HttpResponse } from '.
 
 export type Provider = { new (...args: any[]): any };
 export type ProviderConfig = { token: string; value: Provider };
-export type Middleware = { new (...args: any[]): any };
+export type ControllerProvider = { new (...args: any[]): any };
+export type MiddlewareProvider = { new (...args: any[]): any };
 
 export class AppModule {
   private basePath: string;
@@ -23,9 +24,9 @@ export class AppModule {
   constructor(config: {
     basePath?: string;
     imports?: AppModule[];
-    controllers?: any[];
+    controllers?: ControllerProvider[];
+    middlewares?: MiddlewareProvider[];
     providers?: (Provider | ProviderConfig)[];
-    middlewares?: Middleware[];
   }) {
     this.basePath = config.basePath ?? '/';
     this.router = Router();
