@@ -100,8 +100,14 @@ export class AppModule {
         (name) => name !== 'constructor' && typeof prototype[name] === 'function',
       );
       methodNames.forEach((methodName) => {
-        const middleware = Reflect.getMetadata('middleware', prototype, methodName);
-        if (middleware) this.handleMiddleware({ instance, prototype, methodName });
+        this.router['use']((req, res, next) => {
+          try {
+            const httpMiddlewareContext: HttpMiddlewareContext = { req, res, next };
+            (instance as any)[methodName](httpMiddlewareContext);
+          } catch (error) {
+            next(error);
+          }
+        });
       });
     });
   }
@@ -137,10 +143,19 @@ export class AppModule {
       );
       methodNames.forEach((methodName) => {
         const route = Reflect.getMetadata('route', prototype, methodName);
-        if (route) this.handleController({ instance, methodName, route, prefix });
-        const middleware = Reflect.getMetadata('middleware', prototype, methodName);
-        if (middleware) this.handleMiddleware({ instance, prototype, methodName });
-        console.log({ route, middleware });
+        if (route) {
+          const path = route.path as string;
+          const method = route.method as 'get' | 'post' | 'put' | 'delete' | 'patch';
+          const fullPath = `${prefix}${path}`.replace(/\/+/g, '/');
+          this.router[method](fullPath, (req, res, next) => {
+            try {
+              const httpContext: HttpContext<ExpressRequest, ExpressResponse> = { req, res };
+              (instance as any)[methodName](httpContext);
+            } catch (error) {
+              next(error);
+            }
+          });
+        }
       });
     });
   }
