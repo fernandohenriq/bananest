@@ -78,7 +78,12 @@ export class AppModule {
       methodNames.forEach((methodName) => {
         const middleware = Reflect.getMetadata('middleware', prototype, methodName);
         if (middleware) {
-          const { includeErr = false, routeNotFound = false, errorHandler = false } = middleware;
+          const {
+            includeErr = false,
+            routeNotFound = false,
+            errorHandler = false,
+          } = middleware ?? {};
+          console.log({ middleware, methodName, includeErr, routeNotFound, errorHandler });
           if (routeNotFound) {
             this.routeNotFound = (instance as any)[methodName];
             return;
