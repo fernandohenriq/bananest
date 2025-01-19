@@ -1,5 +1,3 @@
-import { HttpMiddlewareContext } from './app-interfaces';
-
 export function Inject(token: string | { new (...args: any[]): {} }) {
   return function (target: any, propertyKey: string | symbol | undefined, parameterIndex: number) {
     const key = propertyKey || 'constructor';
@@ -20,6 +18,18 @@ export function Middleware(options?: { includeErr?: boolean }) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const { includeErr = false } = options ?? {};
     Reflect.defineMetadata('middleware', { includeErr }, target, propertyKey);
+  };
+}
+
+export function MiddlewareRouteNotFound() {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    Reflect.defineMetadata('middleware', { routeNotFound: true }, target, propertyKey);
+  };
+}
+
+export function MiddlewareErrorHandler() {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    Reflect.defineMetadata('middleware', { errorHandler: true }, target, propertyKey);
   };
 }
 

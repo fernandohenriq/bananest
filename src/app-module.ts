@@ -17,6 +17,8 @@ export class AppModule {
   private basePath: string;
   private router: Router;
   private container: AppContainer;
+  private errorHandler: (ctx: HttpMiddlewareContext) => void;
+  private routeNotFound: (ctx: HttpMiddlewareContext) => void;
   public app = express();
 
   private initialized = false;
@@ -27,10 +29,14 @@ export class AppModule {
     controllers?: ControllerProvider[];
     middlewares?: MiddlewareProvider[];
     providers?: (Provider | ProviderConfig)[];
+    errorHandler?: (ctx: HttpMiddlewareContext) => void;
+    routeNotFound?: (ctx: HttpMiddlewareContext) => void;
   }) {
     this.basePath = config.basePath ?? '/';
     this.router = Router();
     this.container = new AppContainer();
+    this.errorHandler = config.errorHandler ?? (() => {});
+    this.routeNotFound = config.routeNotFound ?? (() => {});
 
     if (Array.isArray(config.imports)) {
       config.imports.forEach((importModule) => {
@@ -70,14 +76,36 @@ export class AppModule {
         (name) => name !== 'constructor' && typeof prototype[name] === 'function',
       );
       methodNames.forEach((methodName) => {
-        this.router['use']((req, res, next) => {
-          try {
-            const httpMiddlewareContext: HttpMiddlewareContext = { req, res, next };
-            (instance as any)[methodName](httpMiddlewareContext);
-          } catch (error) {
-            next(error);
+        const middleware = Reflect.getMetadata('middleware', prototype, methodName);
+        if (middleware) {
+          const { includeErr = false, routeNotFound = false, errorHandler = false } = middleware;
+          if (routeNotFound) {
+            this.routeNotFound = (instance as any)[methodName];
+            return;
           }
-        });
+          if (errorHandler) {
+            this.errorHandler = (instance as any)[methodName];
+            return;
+          }
+          if (includeErr) {
+            middlewares.push((err: any, req: any, res: any, next: any) => {
+              try {
+                (instance as any)[methodName]({ err, req, res, next });
+              } catch (error) {
+                next(error);
+              }
+            });
+            return;
+          }
+          middlewares.push((req: any, res: any, next: any) => {
+            try {
+              const httpContext: HttpMiddlewareContext = { req, res, next };
+              (instance as any)[methodName](httpContext);
+            } catch (error) {
+              next(error);
+            }
+          });
+        }
       });
     });
   }
@@ -138,24 +166,37 @@ export class AppModule {
   }
 
   init() {
+    const router = Router();
     this.app.use(express.json());
     this.app.use(this.basePath, this.router);
     // route not found
-    this.app.use((req: any, res: any, next: any) => {
-      res.status(404).json({
-        message: 'Route not found',
-        path: req.path,
+    if (this.routeNotFound) {
+      router.use((req: any, res: any, next: any) => {
+        this.routeNotFound({ req, res, next });
       });
-    });
+    } else {
+      this.app.use((req: any, res: any, next: any) => {
+        res.status(404).json({
+          message: 'Route not found',
+          path: req.path,
+        });
+      });
+    }
     // error handler
-    this.app.use((err: any, req: any, res: any, next: any) => {
-      res.status(500).json({
-        message: err.message,
-        path: req.path,
-        stack: err.stack,
-        body: JSON.stringify(err, null, 2),
+    if (this.errorHandler) {
+      router.use((err: any, req: any, res: any, next: any) => {
+        this.errorHandler({ err, req, res, next });
       });
-    });
+    } else {
+      this.app.use((err: any, req: any, res: any, next: any) => {
+        res.status(500).json({
+          message: err.message,
+          path: req.path,
+          stack: err.stack,
+          body: JSON.stringify(err, null, 2),
+        });
+      });
+    }
     this.initialized = true;
     return this;
   }
