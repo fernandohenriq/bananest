@@ -125,10 +125,20 @@ export class AppModule {
         (name) => name !== 'constructor' && typeof prototype[name] === 'function',
       );
       const middlewares: ((...args: any[]) => void)[] = [];
+      let middlewareErrorHandler: ((ctx: Required<HttpMiddlewareContext>) => void) | null = null;
+      let middlewareRouteNotFound: ((ctx: HttpMiddlewareContext) => void) | null = null;
       methodNames.forEach((methodName) => {
         const middleware = Reflect.getMetadata('middleware', prototype, methodName);
         if (middleware) {
-          const { includeErr = false } = middleware;
+          const { includeErr = false, errorHandler = false, routeNotFound = false } = middleware;
+          if (errorHandler) {
+            middlewareErrorHandler = (instance as any)[methodName];
+            return;
+          }
+          if (routeNotFound) {
+            middlewareRouteNotFound = (instance as any)[methodName];
+            return;
+          }
           if (includeErr) {
             middlewares.push((err: any, req: any, res: any, next: any) => {
               try {
@@ -138,16 +148,16 @@ export class AppModule {
                 next(error);
               }
             });
-          } else {
-            middlewares.push((req: any, res: any, next: any) => {
-              try {
-                const httpContext: HttpMiddlewareContext = { req, res, next };
-                (instance as any)[methodName](httpContext);
-              } catch (error) {
-                next(error);
-              }
-            });
+            return;
           }
+          middlewares.push((req: any, res: any, next: any) => {
+            try {
+              const httpContext: HttpMiddlewareContext = { req, res, next };
+              (instance as any)[methodName](httpContext);
+            } catch (error) {
+              next(error);
+            }
+          });
         }
       });
       methodNames.forEach((methodName) => {
@@ -167,6 +177,16 @@ export class AppModule {
           return;
         }
       });
+      if (middlewareErrorHandler) {
+        this.router['use']((err: any, req: any, res: any, next: any) =>
+          middlewareErrorHandler?.({ err, req, res, next }),
+        );
+      }
+      if (middlewareRouteNotFound) {
+        this.router['use']((req: any, res: any, next: any) =>
+          middlewareRouteNotFound?.({ req, res, next }),
+        );
+      }
     });
   }
 
