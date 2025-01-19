@@ -17,11 +17,7 @@ export function Controller(prefix: string = '/') {
 }
 
 export function Middleware() {
-  return function (
-    target: HttpMiddlewareContext,
-    propertyKey: string,
-    descriptor: PropertyDescriptor,
-  ) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     let includeErr = false;
     const originalMethod = descriptor.value;
     descriptor.value = function (args: HttpMiddlewareContext) {

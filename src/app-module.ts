@@ -140,6 +140,7 @@ export class AppModule {
         if (route) this.handleController({ instance, methodName, route, prefix });
         const middleware = Reflect.getMetadata('middleware', prototype, methodName);
         if (middleware) this.handleMiddleware({ instance, prototype, methodName });
+        console.log({ route, middleware });
       });
     });
   }
