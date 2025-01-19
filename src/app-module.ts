@@ -149,12 +149,37 @@ export class AppModule {
           const fullPath = `${prefix}${path}`.replace(/\/+/g, '/');
           this.router[method](fullPath, (req, res, next) => {
             try {
-              const httpContext: HttpContext<ExpressRequest, ExpressResponse> = { req, res };
+              const httpContext: HttpContext<ExpressRequest, ExpressResponse> = { req, res, next };
               (instance as any)[methodName](httpContext);
             } catch (error) {
               next(error);
             }
           });
+          return;
+        }
+        const middleware = Reflect.getMetadata('middleware', prototype, methodName);
+        if (middleware) {
+          const { includeErr = false } = middleware;
+          if (includeErr) {
+            this.router['use']((err: any, req: any, res: any, next: any) => {
+              try {
+                const httpContext: HttpMiddlewareContext = { err, req, res, next };
+                (instance as any)[methodName](httpContext);
+              } catch (error) {
+                next(error);
+              }
+            });
+          } else {
+            this.router['use']((req, res, next) => {
+              try {
+                const httpContext: HttpMiddlewareContext = { req, res, next };
+                (instance as any)[methodName](httpContext);
+              } catch (error) {
+                next(error);
+              }
+            });
+          }
+          return;
         }
       });
     });

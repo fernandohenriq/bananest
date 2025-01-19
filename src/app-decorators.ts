@@ -16,17 +16,10 @@ export function Controller(prefix: string = '/') {
   };
 }
 
-export function Middleware() {
+export function Middleware(options?: { includeErr?: boolean }) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-    let includeErr = false;
-    const originalMethod = descriptor.value;
-    descriptor.value = function (args: HttpMiddlewareContext) {
-      includeErr = !!args?.err;
-      const result = originalMethod.apply(this, args);
-      return result;
-    };
-    Reflect.defineMetadata('middleware', true, target, propertyKey);
-    Reflect.defineMetadata('middleware_include_err', true, target, propertyKey);
+    const { includeErr = false } = options ?? {};
+    Reflect.defineMetadata('middleware', { includeErr }, target, propertyKey);
   };
 }
 
@@ -50,7 +43,11 @@ export function Patch(path: string = '') {
   return Route(path, 'patch');
 }
 
-function Route(path: string, method: 'get' | 'post' | 'put' | 'delete' | 'patch') {
+export function Any(path: string = '') {
+  return Route(path, 'use');
+}
+
+function Route(path: string, method: 'get' | 'post' | 'put' | 'delete' | 'patch' | 'use') {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     Reflect.defineMetadata('route', { path, method }, target, propertyKey);
   };
