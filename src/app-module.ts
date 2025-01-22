@@ -1,12 +1,7 @@
-import express, {
-  NextFunction as ExpressNextFunction,
-  Request as ExpressRequest,
-  Response as ExpressResponse,
-  Router,
-} from 'express';
+import express, { Router } from 'express';
 
 import { AppContainer } from './app-container';
-import { HttpContext, HttpMiddlewareContext, HttpRequest, HttpResponse } from './app-interfaces';
+import { HttpContext, HttpMiddlewareContext } from './app-interfaces';
 
 export type Provider = { new (...args: any[]): any };
 export type ProviderConfig = { token: string; value: Provider };
@@ -167,7 +162,7 @@ export class AppModule {
           const fullPath = `${prefix}${path}`.replace(/\/+/g, '/');
           this.router[method](fullPath, middlewares, (req: any, res: any, next: any) => {
             try {
-              const httpContext: HttpContext<ExpressRequest, ExpressResponse> = { req, res, next };
+              const httpContext: HttpContext = { req, res, next };
               (instance as any)[methodName](httpContext);
             } catch (error) {
               next(error);
