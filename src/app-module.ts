@@ -83,7 +83,6 @@ export class AppModule {
             routeNotFound = false,
             errorHandler = false,
           } = middleware ?? {};
-          console.log({ middleware, methodName, includeErr, routeNotFound, errorHandler });
           if (routeNotFound) {
             this.routeNotFound = (instance as any)[methodName];
             return;
