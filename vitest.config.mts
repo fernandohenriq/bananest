@@ -8,5 +8,6 @@ export default defineConfig({
     testTimeout: 30000, // 30 seconds
     include: ['src/**/*.{test,spec}.{js,ts}'],
     exclude: ['node_modules', 'dist', 'build'],
+    globals: true
   },
 });
