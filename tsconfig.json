@@ -16,6 +16,6 @@
     "moduleResolution": "node",
     "types": ["vitest/globals"]
   },
-  "include": ["./src/**/*", "package.json", "src/__tests__/setup-file.ts"],
+  "include": ["./src/**/*", "package.json"],
   "exclude": ["node_modules", "dist"]
 }
