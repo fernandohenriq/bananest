@@ -111,6 +111,11 @@ export class AppModule {
     return this;
   }
 
+  getApp(): express.Application {
+    if (!this.app) this.init();
+    return this.app!;
+  }
+
   start(port: number, callback?: () => void) {
     if (!this.app) this.init();
     this.app!.listen(
