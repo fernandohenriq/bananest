@@ -1,254 +1,156 @@
-import express, { Router } from 'express';
+import { container } from 'tsyringe';
+import express, { Application, Router } from 'express';
+import { HttpMiddlewareOptions } from './app-decorators.js';
+import { HttpContext, HttpMethod } from './app-interfaces.js';
 
-import { AppContainer } from './app-container';
-import { HttpContext, HttpMiddlewareContext } from './app-interfaces';
-
-export type Provider = { new (...args: any[]): any };
-export type ProviderConfig = { token: string; value: Provider };
-export type ControllerProvider = { new (...args: any[]): any };
-export type MiddlewareProvider = { new (...args: any[]): any };
+type ProviderClass = new (...args: any[]) => any;
+type ProviderInput = { token: string; useClass: ProviderClass };
 
 export class AppModule {
-  private basePath: string;
-  private router: Router;
-  private container: AppContainer;
-  private errorHandler: (ctx: HttpMiddlewareContext) => void;
-  private routeNotFound: (ctx: HttpMiddlewareContext) => void;
-  public app = express();
+  private app: Application = express();
+  private router: Router = Router();
 
-  private initialized = false;
-
-  constructor(config: {
-    basePath?: string;
-    imports?: AppModule[];
-    controllers?: ControllerProvider[];
-    middlewares?: MiddlewareProvider[];
-    providers?: (Provider | ProviderConfig)[];
-    errorHandler?: (ctx: HttpMiddlewareContext) => void;
-    routeNotFound?: (ctx: HttpMiddlewareContext) => void;
-  }) {
-    this.basePath = config.basePath ?? '/';
-    this.router = Router();
-    this.container = new AppContainer();
-    this.errorHandler = config.errorHandler ?? (() => {});
-    this.routeNotFound = config.routeNotFound ?? (() => {});
-
-    if (Array.isArray(config.imports)) {
-      config.imports.forEach((importModule) => {
-        this.import(importModule);
-      });
-    }
-
-    if (Array.isArray(config.middlewares)) {
-      this.setMiddlewares(config.middlewares);
-    }
-
-    if (Array.isArray(config.providers)) {
-      this.setProviders(config.providers);
-    }
-
-    if (Array.isArray(config.controllers)) {
-      this.setControllers(config.controllers);
-    }
-  }
-
-  setProviders(providers: any[]) {
-    providers.forEach((provider) => {
-      if ('name' in provider) {
-        this.container.register(provider.name, provider);
-      } else {
-        this.container.register(provider.token, provider.value);
-      }
-    });
-  }
-
-  setMiddlewares(middlewares: any[]) {
-    middlewares.forEach((middleware) => {
-      this.container.register(middleware.name, middleware);
-      const instance = this.container.resolve(middleware);
-      const prototype = Object.getPrototypeOf(instance);
-      const methodNames = Object.getOwnPropertyNames(prototype).filter(
-        (name) => name !== 'constructor' && typeof prototype[name] === 'function',
+  constructor(
+    public config: {
+      prefix?: string;
+      imports?: AppModule[];
+      providers?: (ProviderClass | ProviderInput)[];
+      cors?: {
+        allowedOrigin?: string;
+        allowedMethods?: string[];
+        allowedHeaders?: string[];
+      };
+    },
+  ) {
+    this.router.use((req, res, next) => {
+      res.setHeader(
+        'Access-Control-Allow-Origin',
+        this.config?.cors?.allowedOrigin ?? '*',
       );
-      methodNames.forEach((methodName) => {
-        const middleware = Reflect.getMetadata('middleware', prototype, methodName);
-        if (middleware) {
-          const {
-            includeErr = false,
-            routeNotFound = false,
-            errorHandler = false,
-          } = middleware ?? {};
-          if (routeNotFound) {
-            this.routeNotFound = (instance as any)[methodName];
-            return;
-          }
-          if (errorHandler) {
-            this.errorHandler = (instance as any)[methodName];
-            return;
-          }
-          if (includeErr) {
-            this.router['use']((err: any, req: any, res: any, next: any) => {
-              try {
-                (instance as any)[methodName]({ err, req, res, next });
-              } catch (error) {
-                next(error);
-              }
-            });
-            return;
-          }
-          this.router['use']((req: any, res: any, next: any) => {
-            try {
-              const httpContext: HttpMiddlewareContext = { req, res, next };
-              (instance as any)[methodName](httpContext);
-            } catch (error) {
-              next(error);
-            }
-          });
-        }
-      });
-    });
-  }
-
-  setControllers(controllers: any[]) {
-    controllers.forEach((controller) => {
-      this.container.register(controller.name, controller);
-      const instance = this.container.resolve(controller);
-      const prototype = Object.getPrototypeOf(instance);
-      const prefix = Reflect.getMetadata('prefix', controller) || '';
-      const methodNames = Object.getOwnPropertyNames(prototype).filter(
-        (name) => name !== 'constructor' && typeof prototype[name] === 'function',
+      res.setHeader(
+        'Access-Control-Allow-Methods',
+        this.config?.cors?.allowedMethods?.join(', ') ??
+          'GET, POST, PUT, DELETE, PATCH, OPTIONS',
       );
-      const middlewares: ((...args: any[]) => void)[] = [];
-      let middlewareErrorHandler: ((ctx: Required<HttpMiddlewareContext>) => void) | null = null;
-      let middlewareRouteNotFound: ((ctx: HttpMiddlewareContext) => void) | null = null;
-      methodNames.forEach((methodName) => {
-        const middleware = Reflect.getMetadata('middleware', prototype, methodName);
-        if (middleware) {
-          const { includeErr = false, errorHandler = false, routeNotFound = false } = middleware;
-          if (errorHandler) {
-            middlewareErrorHandler = (instance as any)[methodName];
-            return;
-          }
-          if (routeNotFound) {
-            middlewareRouteNotFound = (instance as any)[methodName];
-            return;
-          }
-          if (includeErr) {
-            middlewares.push((err: any, req: any, res: any, next: any) => {
-              try {
-                const httpContext: HttpMiddlewareContext = { err, req, res, next };
-                (instance as any)[methodName](httpContext);
-              } catch (error) {
-                next(error);
-              }
-            });
-            return;
-          }
-          middlewares.push((req: any, res: any, next: any) => {
-            try {
-              const httpContext: HttpMiddlewareContext = { req, res, next };
-              (instance as any)[methodName](httpContext);
-            } catch (error) {
-              next(error);
-            }
-          });
-        }
-      });
-      methodNames.forEach((methodName) => {
-        const route = Reflect.getMetadata('route', prototype, methodName);
-        if (route) {
-          const path = route.path as string;
-          const method = route.method as 'get' | 'post' | 'put' | 'delete' | 'patch';
-          const fullPath = `${prefix}${path}`.replace(/\/+/g, '/');
-          this.router[method](fullPath, middlewares, (req: any, res: any, next: any) => {
-            try {
-              const httpContext: HttpContext = { req, res, next };
-              (instance as any)[methodName](httpContext);
-            } catch (error) {
-              next(error);
-            }
-          });
-          return;
-        }
-      });
-      if (middlewareErrorHandler) {
-        this.router['use']((err: any, req: any, res: any, next: any) =>
-          middlewareErrorHandler?.({ err, req, res, next }),
+      if (this.config.cors && Array.isArray(this.config.cors?.allowedHeaders)) {
+        res.setHeader(
+          'Access-Control-Allow-Headers',
+          this.config.cors.allowedHeaders.join(', '),
         );
       }
-      if (middlewareRouteNotFound) {
-        this.router['use']((req: any, res: any, next: any) =>
-          middlewareRouteNotFound?.({ req, res, next }),
-        );
-      }
+      next();
     });
   }
 
   init() {
-    const router = Router();
-    this.app.use(express.json());
-    this.app.use(this.basePath, this.router);
-    // route not found
-    if (this.routeNotFound) {
-      router.use((req: any, res: any, next: any) => {
-        this.routeNotFound({ req, res, next });
+    this.config.imports?.forEach((module) => module.init());
+    this.config.providers?.forEach((provider) => {
+      container.register(
+        'token' in provider ? provider.token : provider?.name,
+        'useClass' in provider ? provider.useClass : provider,
+      );
+    });
+    this.config.providers?.forEach((providerOptions) => {
+      const provider =
+        'useClass' in providerOptions
+          ? providerOptions.useClass
+          : providerOptions;
+      const instance = container.resolve(provider);
+      const prototype = Object.getPrototypeOf(instance);
+      const handlers = Object.getOwnPropertyNames(prototype).filter(
+        (prop) => prop !== 'constructor',
+      );
+      const router = Router();
+      handlers.forEach((handler) => {
+        const isHttpHandler = Reflect.getMetadata(
+          'http:handler',
+          prototype,
+          handler,
+        );
+        if (isHttpHandler) {
+          const path = Reflect.getMetadata(
+            'http:handler:path',
+            prototype,
+            handler,
+          );
+          const method: HttpMethod = Reflect.getMetadata(
+            'http:handler:method',
+            prototype,
+            handler,
+          );
+          const finalPath = `/${path.split('/').filter(Boolean).join('/')}`;
+          router[method](finalPath, (req: any, res: any, next: any) => {
+            try {
+              const ctx: HttpContext = { req, res, next };
+              instance[handler].bind(instance)(ctx);
+            } catch (error) {
+              next(error);
+            }
+          });
+        }
+        const isHttpMiddleware = Reflect.getMetadata(
+          'http:middleware',
+          prototype,
+          handler,
+        );
+        if (isHttpMiddleware) {
+          const path = Reflect.getMetadata(
+            'http:middleware:path',
+            prototype,
+            handler,
+          );
+          const options: HttpMiddlewareOptions = Reflect.getMetadata(
+            'http:middleware:options',
+            prototype,
+            handler,
+          );
+          const finalPath = `/${path.split('/').filter(Boolean).join('/')}`;
+          if (!options?.error) {
+            router['use'](finalPath, (req: any, res: any, next: any) => {
+              try {
+                const ctx: HttpContext = { req, res, next };
+                instance[handler].bind(instance)(ctx);
+              } catch (error) {
+                next(error);
+              }
+            });
+          } else {
+            router['use'](
+              finalPath,
+              (err: any, req: any, res: any, next: any) => {
+                try {
+                  const ctx: HttpContext = { err, req, res, next };
+                  instance[handler].bind(instance)(ctx);
+                } catch (error) {
+                  next(error);
+                }
+              },
+            );
+          }
+        }
+        return;
       });
-    } else {
-      this.app.use((req: any, res: any, next: any) => {
-        res.status(404).json({
-          message: 'Route not found',
-          path: req.path,
-        });
-      });
-    }
-    // error handler
-    if (this.errorHandler) {
-      router.use((err: any, req: any, res: any, next: any) => {
-        this.errorHandler({ err, req, res, next });
-      });
-    } else {
-      this.app.use((err: any, req: any, res: any, next: any) => {
-        res.status(500).json({
-          message: err.message,
-          path: req.path,
-          stack: err.stack,
-          body: JSON.stringify(err, null, 2),
-        });
-      });
-    }
-    this.initialized = true;
+      const prefix = Reflect.getMetadata('provider:prefix', provider) ?? '/';
+      const parsedPrefix = `/${prefix?.split('/').filter(Boolean).join('/')}`;
+      this.router.use(parsedPrefix, router);
+    });
     return this;
   }
 
-  import(module: AppModule) {
-    const { basePath, router, container } = module.export();
-    this.container.import(container);
-    this.router.use(basePath, router);
-  }
-
-  export() {
-    return {
-      basePath: this.basePath,
-      router: this.router,
-      container: this.container.export(),
-    };
-  }
-
-  getApp() {
-    return this.app;
-  }
-
-  close() {
-    this.initialized = false;
-    process.exit(0);
-  }
-
-  start(port: number = 3000, callback?: (port?: number) => void) {
-    if (!this.initialized) this.init();
-    this.app.listen(port, () => {
-      callback
-        ? callback(port)
-        : console.info(`[${this.constructor.name}] Server is on http://localhost:${port}`);
-    });
+  start(port: number, callback?: () => void) {
+    this.app.use(express.json());
+    this.config.imports?.forEach((module) => this.router.use(module.router));
+    const prefix = `/${this.config?.prefix?.split('/').filter(Boolean).join('/') ?? ''}`;
+    this.app.use(prefix, this.router);
+    this.app.listen(
+      port,
+      callback ??
+        (() => {
+          console.info(
+            `[${this.constructor.name}] Running on http://localhost:${port}`,
+          );
+        }),
+    );
+    return this;
   }
 }

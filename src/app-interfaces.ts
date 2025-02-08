@@ -20,12 +20,6 @@ export type HttpError<E = unknown> = E;
 export type HttpContext<T = object, U = object, E = unknown> = {
   req: HttpRequest<T>;
   res: HttpResponse<U>;
-  next?: HttpNext<E>;
-};
-
-export type HttpMiddlewareContext<T = object, U = object, E = unknown> = {
-  req: HttpRequest<T>;
-  res: HttpResponse<U>;
+  next: HttpNext<E>;
   err?: HttpError<E>;
-  next?: HttpNext<E>;
 };
