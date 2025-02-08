@@ -21,7 +21,9 @@
   "scripts": {
     "clean": "rm -rf build",
     "build": "npm run clean && tsup src/index.ts --outDir build --format esm,cjs --dts",
-    "bump": "npm version patch && git push && npm run build && npm publish"
+    "major": "npm version major && git push && npm run build && npm publish",
+    "minor": "npm version minor && git push && npm run build && npm publish",
+    "patch": "npm version patch && git push && npm run build && npm publish"
   },
   "dependencies": {
     "unplugin-swc": "^1.5.1",
