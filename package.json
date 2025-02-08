@@ -21,7 +21,6 @@
   "scripts": {
     "clean": "rm -rf build",
     "build": "npm run clean && tsup src/index.ts --outDir build --format esm,cjs --dts",
-    "test": "vitest --config vitest.config.mts",
     "bump": "npm version patch && git push && npm run build && npm publish"
   },
   "dependencies": {
