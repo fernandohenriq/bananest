@@ -13,8 +13,7 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "sourceMap": true,
-    "moduleResolution": "node",
-    "types": ["vitest/globals"]
+    "moduleResolution": "node"
   },
   "include": ["./src/**/*", "package.json"],
   "exclude": ["node_modules", "dist"]
