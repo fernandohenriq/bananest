@@ -47,6 +47,7 @@ export class AppModule {
         'useClass' in provider ? provider.useClass : provider,
       );
     });
+    const router = express.Router();
     this.config.providers?.forEach((providerOptions) => {
       const provider = 'useClass' in providerOptions ? providerOptions.useClass : providerOptions;
       const instance = container.resolve(provider);
@@ -54,7 +55,6 @@ export class AppModule {
       const handlers = Object.getOwnPropertyNames(prototype).filter(
         (prop) => prop !== 'constructor',
       );
-      const router = express.Router();
       handlers.forEach((handler) => {
         const isHttpHandler = Reflect.getMetadata('http:handler', prototype, handler);
         if (isHttpHandler) {
