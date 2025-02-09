@@ -36,10 +36,7 @@ export class AppModule {
     });
   }
 
-  init() {
-    this.app = express();
-    this.app.use(express.json());
-
+  private init() {
     this.config.imports?.forEach((module) => module.init());
     this.config.providers?.forEach((provider) => {
       container.register(
@@ -54,14 +51,16 @@ export class AppModule {
       const handlers = Object.getOwnPropertyNames(prototype).filter(
         (prop) => prop !== 'constructor',
       );
-      const router = express.Router();
+      const providerRouter = express.Router();
+      const providerPrefix = Reflect.getMetadata('provider:prefix', provider) ?? '/';
+      const providerPrefixParsed = `/${providerPrefix?.split('/').filter(Boolean).join('/')}`;
       handlers.forEach((handler) => {
         const isHttpHandler = Reflect.getMetadata('http:handler', prototype, handler);
         if (isHttpHandler) {
           const path = Reflect.getMetadata('http:handler:path', prototype, handler);
           const method: HttpMethod = Reflect.getMetadata('http:handler:method', prototype, handler);
           const finalPath = `/${path.split('/').filter(Boolean).join('/')}`;
-          router[method](finalPath, (req: any, res: any, next: any) => {
+          providerRouter[method](finalPath, (req: any, res: any, next: any) => {
             try {
               const ctx: HttpContext = { req, res, next };
               instance[handler].bind(instance)(ctx);
@@ -80,7 +79,7 @@ export class AppModule {
           );
           const finalPath = `/${path.split('/').filter(Boolean).join('/')}`;
           if (!options?.error) {
-            router['use'](finalPath, (req: any, res: any, next: any) => {
+            providerRouter['use'](finalPath, (req: any, res: any, next: any) => {
               try {
                 const ctx: HttpContext = { req, res, next };
                 instance[handler].bind(instance)(ctx);
@@ -89,7 +88,7 @@ export class AppModule {
               }
             });
           } else {
-            router['use'](finalPath, (err: any, req: any, res: any, next: any) => {
+            providerRouter['use'](finalPath, (err: any, req: any, res: any, next: any) => {
               try {
                 const ctx: HttpContext = { err, req, res, next };
                 instance[handler].bind(instance)(ctx);
@@ -101,28 +100,38 @@ export class AppModule {
         }
         return;
       });
-      const prefix = Reflect.getMetadata('provider:prefix', provider) ?? '/';
-      const parsedPrefix = `/${prefix?.split('/').filter(Boolean).join('/')}`;
-      this.router.use(parsedPrefix, router);
+      this.router.use(providerPrefixParsed, providerRouter);
     });
     this.config.imports?.forEach((module) => this.router.use(module.router));
     const prefix = `/${this.config?.prefix?.split('/').filter(Boolean).join('/') ?? ''}`;
-    this.app.use(prefix, this.router);
+    const prevRouter = this.router;
+    this.router = express.Router();
+    this.router.use(prefix, prevRouter);
     return this;
   }
 
+  private setupApp() {
+    this.app = express();
+    this.app.use(express.json());
+    this.init();
+    this.app.use(this.router);
+    return this.app;
+  }
+
   getApp(): express.Application {
-    if (!this.app) this.init();
+    if (!this.app) this.setupApp();
     return this.app!;
   }
 
   start(port: number, callback?: () => void) {
-    if (!this.app) this.init();
+    if (!this.app) this.setupApp();
     this.app!.listen(
       port,
       callback ??
         (() => {
-          console.info(`[${this.constructor.name}] Running on http://localhost:${port}`);
+          console.info(
+            `[${this?.constructor?.name ?? 'AppModule'}] Running on http://localhost:${port}`,
+          );
         }),
     );
     return this;
