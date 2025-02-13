@@ -1,10 +1,17 @@
 import express from 'express';
 import { container } from 'tsyringe';
-import { HttpContext } from './app-interfaces.js';
+
 import { HttpHandlerOptions, HttpMiddlewareOptions } from './app-decorators.js';
+import { HttpContext } from './app-interfaces.js';
 
 type ProviderClass = new (...args: any[]) => any;
 type ProviderInput = { token: string; useClass: ProviderClass };
+type ProviderOption = ProviderInput | ProviderClass;
+type AppModuleOptions = {
+  prefix?: string;
+  providers?: ProviderOption[];
+  imports?: AppModule[];
+};
 
 export class AppModule {
   private router = express.Router();
@@ -12,11 +19,11 @@ export class AppModule {
 
   private options: {
     prefix: string;
-    providers: (ProviderInput | ProviderClass)[];
+    providers: ProviderOption[];
     imports: AppModule[];
   };
 
-  constructor(options: Partial<AppModule['options']>) {
+  constructor(options: AppModuleOptions) {
     // set options
     this.options = {
       prefix: this.parsePath(options.prefix ?? '/'),
@@ -26,14 +33,8 @@ export class AppModule {
 
     // pre-register providers
     this.options.providers.forEach((providerOptions) => {
-      const provider =
-        'useClass' in providerOptions
-          ? providerOptions.useClass
-          : providerOptions;
-      const token =
-        'token' in providerOptions
-          ? providerOptions.token
-          : providerOptions.name;
+      const provider = 'useClass' in providerOptions ? providerOptions.useClass : providerOptions;
+      const token = 'token' in providerOptions ? providerOptions.token : providerOptions.name;
 
       container.register(token, { useClass: provider });
     });
@@ -66,20 +67,14 @@ export class AppModule {
     const apiRouter = express.Router();
 
     this.options.providers.forEach((providerOptions) => {
-      const provider =
-        'useClass' in providerOptions
-          ? providerOptions.useClass
-          : providerOptions;
+      const provider = 'useClass' in providerOptions ? providerOptions.useClass : providerOptions;
       const classInstance = container.resolve(provider);
       const prototype = Object.getPrototypeOf(classInstance);
       const classMethodNames = Object.getOwnPropertyNames(prototype).filter(
         (prop) => prop !== 'constructor',
       );
 
-      const controllerOptions = Reflect.getMetadata(
-        'provider:controller:options',
-        provider,
-      );
+      const controllerOptions = Reflect.getMetadata('provider:controller:options', provider);
 
       if (controllerOptions) {
         classMethodNames.forEach((methodName) => {
@@ -97,29 +92,24 @@ export class AppModule {
               controllerOptions.prefix + '/' + httpHandlerOptions.path,
             );
 
-            apiRouter[httpHandlerOptions.method](
-              finalPath,
-              async (req, res, next) => {
-                try {
-                  await providerHandler({ req, res, next });
-                } catch (error) {
-                  next(error);
-                }
-              },
-            );
+            apiRouter[httpHandlerOptions.method](finalPath, async (req, res, next) => {
+              try {
+                await providerHandler({ req, res, next });
+              } catch (error) {
+                next(error);
+              }
+            });
           }
 
-          const httpMiddlewareOptions: HttpMiddlewareOptions =
-            Reflect.getMetadata(
-              'http:middleware:options',
-              prototype,
-              methodName,
-            );
+          const httpMiddlewareOptions: HttpMiddlewareOptions = Reflect.getMetadata(
+            'http:middleware:options',
+            prototype,
+            methodName,
+          );
 
           if (httpMiddlewareOptions) {
             const finalPath = this.parsePath(
-              controllerOptions.prefix + '/' + httpMiddlewareOptions?.path ||
-                '/',
+              controllerOptions.prefix + '/' + httpMiddlewareOptions?.path || '/',
             );
 
             if (!httpMiddlewareOptions?.error) {
@@ -131,37 +121,30 @@ export class AppModule {
                 }
               });
             } else {
-              apiRouter['use'](
-                finalPath,
-                async (err: any, req: any, res: any, next: any) => {
-                  try {
-                    await providerHandler({ err, req, res, next });
-                  } catch (error) {
-                    next(error);
-                  }
-                },
-              );
+              apiRouter['use'](finalPath, async (err: any, req: any, res: any, next: any) => {
+                try {
+                  await providerHandler({ err, req, res, next });
+                } catch (error) {
+                  next(error);
+                }
+              });
             }
           }
         });
       }
 
-      const middlewareOptions = Reflect.getMetadata(
-        'provider:middleware:options',
-        provider,
-      );
+      const middlewareOptions = Reflect.getMetadata('provider:middleware:options', provider);
 
       if (middlewareOptions) {
         classMethodNames.forEach((methodName) => {
           const providerHandler: (ctx: HttpContext) => any =
             classInstance[methodName].bind(classInstance);
 
-          const httpMiddlewareOptions: HttpMiddlewareOptions =
-            Reflect.getMetadata(
-              'http:middleware:options',
-              prototype,
-              methodName,
-            );
+          const httpMiddlewareOptions: HttpMiddlewareOptions = Reflect.getMetadata(
+            'http:middleware:options',
+            prototype,
+            methodName,
+          );
 
           const finalPath = this.parsePath(
             `/${middlewareOptions?.prefix ?? ''}/${httpMiddlewareOptions?.path ?? ''}`,
@@ -176,16 +159,13 @@ export class AppModule {
               }
             });
           } else {
-            apiRouter['use'](
-              finalPath,
-              async (err: any, req: any, res: any, next: any) => {
-                try {
-                  await providerHandler({ err, req, res, next });
-                } catch (error) {
-                  next(error);
-                }
-              },
-            );
+            apiRouter['use'](finalPath, async (err: any, req: any, res: any, next: any) => {
+              try {
+                await providerHandler({ err, req, res, next });
+              } catch (error) {
+                next(error);
+              }
+            });
           }
         });
       }
