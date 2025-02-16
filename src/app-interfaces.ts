@@ -1,25 +1,56 @@
-export type HttpMethod = 'get' | 'post' | 'put' | 'delete' | 'patch';
+import { AppModule } from './app-module';
 
-export type HttpRequest<T = object> = T & {
+export type HttpMethods = 'post' | 'get' | 'patch' | 'put' | 'delete';
+
+export interface HttpReq {
+  body: any;
+  headers: {
+    ['content-type']: string;
+    ['accept']: string;
+    ['authorization']: string;
+    [key: string]: string;
+  };
+  params: any;
+  query: any;
+  method: string;
+  url: string;
+  originalUrl: string;
+  baseUrl: string;
   path: string;
-  body?: any;
-  params?: Record<string, any>;
-  query?: Record<string, any>;
-  headers?: Record<string, any>;
+  protocol: string;
+  secure: boolean;
+  subdomains: string[];
+  ip: string;
+  ips: string[];
+  hostname: string;
+  [key: string]: any;
+}
+
+export interface HttpRes {
+  status: (status: number) => HttpRes;
+  json: (body: any) => HttpRes;
+}
+
+export type HttpErr = any;
+export type HttpNext = (err?: any) => void;
+
+export type HttpContext = {
+  req: HttpReq;
+  res: HttpRes;
+  next: HttpNext;
+  err?: HttpErr;
 };
 
-export type HttpResponse<T = object> = T & {
-  status: (status: number) => HttpResponse<T>;
-  send: <U = any>(body: U) => void;
-};
+export type HttpHandler = (ctx: HttpContext) => any;
+export type HttpMiddlewareOptions = { errorHandler?: boolean };
 
-export type HttpNext<E = unknown> = (err?: E) => void;
+export interface ModuleOptions {
+  path?: string;
+  providers?: { key?: string; useClass: any }[];
+  imports?: AppModule[];
+}
 
-export type HttpError<E = unknown> = E;
-
-export type HttpContext<T = object, U = object, E = unknown> = {
-  req: HttpRequest<T>;
-  res: HttpResponse<U>;
-  next: HttpNext<E>;
-  err?: HttpError<E>;
-};
+export interface ClassProvider<T> {
+  provide: string | Function;
+  useClass: new (...args: any[]) => T;
+}

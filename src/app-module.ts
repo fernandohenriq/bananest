@@ -1,196 +1,167 @@
-import express from 'express';
-import { container } from 'tsyringe';
+import express, { Application, NextFunction } from 'express';
+import { DependencyContainer, container } from 'tsyringe';
 
-import { HttpHandlerOptions, HttpMiddlewareOptions } from './app-decorators.js';
-import { HttpContext } from './app-interfaces.js';
-
-type ProviderClass = new (...args: any[]) => any;
-type ProviderInput = { token: string; useClass: ProviderClass };
-type ProviderOption = ProviderInput | ProviderClass;
-type AppModuleOptions = {
-  prefix?: string;
-  providers?: ProviderOption[];
-  imports?: AppModule[];
-};
+import {
+  HttpContext,
+  HttpHandler,
+  HttpMethods,
+  HttpMiddlewareOptions,
+  HttpReq,
+  HttpRes,
+  ModuleOptions,
+} from './app-interfaces';
 
 export class AppModule {
-  private router = express.Router();
-  private app?: express.Application;
+  private expressApp?: Application;
+  private isInitialized = false;
+  private container: DependencyContainer = container.createChildContainer();
 
-  private options: {
-    prefix: string;
-    providers: ProviderOption[];
-    imports: AppModule[];
-  };
+  constructor(private options: ModuleOptions) {
+    const app = express();
+    app.use(express.json());
+  }
 
-  constructor(options: AppModuleOptions) {
-    // set options
-    this.options = {
-      prefix: this.parsePath(options.prefix ?? '/'),
-      providers: options.providers ?? [],
-      imports: options.imports ?? [],
-    };
+  private async initModules(module: AppModule, visited = new Set<AppModule>()) {
+    if (visited.has(module)) return;
+    visited.add(module);
 
-    // pre-register providers
-    this.options.providers.forEach((providerOptions) => {
-      const provider = 'useClass' in providerOptions ? providerOptions.useClass : providerOptions;
-      const token = 'token' in providerOptions ? providerOptions.token : providerOptions.name;
+    // Register providers (now including controllers)
+    const allProviders = module.options.providers || [];
 
-      container.register(token, { useClass: provider });
+    allProviders.forEach((provider: { key?: string; useClass: any }) => {
+      const token = provider.key || provider.useClass;
+      this.container.register(token, { useClass: provider.useClass });
     });
+
+    // Process imported modules
+    await Promise.all(module.options.imports?.map((m) => this.initModules(m, visited)) ?? []);
   }
 
-  private parsePath(path: string) {
-    if (!path) return '';
-    return '/' + path.split('/').filter(Boolean).join('/');
-  }
+  private createExpressHandler(handler: HttpHandler) {
+    return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const ctx: HttpContext = {
+        req: req as unknown as HttpReq,
+        res: res as unknown as HttpRes,
+        next,
+      };
 
-  export() {
-    return {
-      app: this.app,
-      router: this.router,
-      options: this.options,
+      try {
+        await handler(ctx);
+      } catch (err) {
+        next(err);
+      }
     };
   }
 
-  setup() {
-    if (this.app) return this;
-    this.app = express();
-    this.app.use(express.json());
-    this.app.use(express.urlencoded({ extended: true }));
-    this.init();
-    this.app.use(this.router);
-    return this;
-  }
+  async init() {
+    if (this.isInitialized) return;
+    await this.initModules(this);
 
-  init() {
-    const apiRouter = express.Router();
+    // Collect all controllers
+    const controllers = [
+      ...(this.options.providers?.map((p) => p.useClass) || []),
+      ...(this.options.imports?.flatMap(
+        (m) => m.options.providers?.map((p: any) => p.useClass) || [],
+      ) || []),
+    ];
 
-    this.options.providers.forEach((providerOptions) => {
-      const provider = 'useClass' in providerOptions ? providerOptions.useClass : providerOptions;
-      const classInstance = container.resolve(provider);
-      const prototype = Object.getPrototypeOf(classInstance);
-      const classMethodNames = Object.getOwnPropertyNames(prototype).filter(
-        (prop) => prop !== 'constructor',
-      );
+    // Initialize Express
+    this.expressApp = express();
+    this.expressApp.use(express.json());
 
-      const controllerOptions = Reflect.getMetadata('provider:controller:options', provider);
+    // Process controllers
+    const processModule = (module: AppModule, parentPath: string = ''): any[] => {
+      const currentModulePath = [parentPath, module.options.path]
+        .filter((p) => p && p !== '/')
+        .join('/')
+        .replace(/\/+/g, '/');
 
-      if (controllerOptions) {
-        classMethodNames.forEach((methodName) => {
-          const providerHandler: (ctx: HttpContext) => any =
-            classInstance[methodName].bind(classInstance);
+      const controllers = [
+        ...(module.options.providers?.map((p) => p.useClass) || []),
+        ...(module.options.imports?.flatMap((m) => processModule(m, currentModulePath)) || []),
+      ];
 
-          const httpHandlerOptions: HttpHandlerOptions = Reflect.getMetadata(
-            'http:handler:options',
-            prototype,
-            methodName,
-          );
+      controllers.forEach((ControllerClass) => {
+        const controllerPath = Reflect.getMetadata('controller:path', ControllerClass);
+        const routes = Reflect.getMetadata('controller:routes', ControllerClass) || [];
+        const middlewares = Reflect.getMetadata('controller:middlewares', ControllerClass) || [];
 
-          if (httpHandlerOptions) {
-            const finalPath = this.parsePath(
-              controllerOptions.prefix + '/' + httpHandlerOptions.path,
-            );
+        const router = express.Router();
+        const controllerInstance = this.container.resolve(ControllerClass);
 
-            apiRouter[httpHandlerOptions.method](finalPath, async (req, res, next) => {
-              try {
-                await providerHandler({ req, res, next });
-              } catch (error) {
-                next(error);
-              }
-            });
-          }
-
-          const httpMiddlewareOptions: HttpMiddlewareOptions = Reflect.getMetadata(
-            'http:middleware:options',
-            prototype,
-            methodName,
-          );
-
-          if (httpMiddlewareOptions) {
-            const finalPath = this.parsePath(
-              controllerOptions.prefix + '/' + httpMiddlewareOptions?.path || '/',
-            );
-
-            if (!httpMiddlewareOptions?.error) {
-              apiRouter['use'](finalPath, async (req, res, next) => {
-                try {
-                  await providerHandler({ req, res, next });
-                } catch (error) {
-                  next(error);
-                }
-              });
+        // Apply middlewares
+        middlewares.forEach(
+          ({
+            path,
+            handler,
+            options,
+          }: {
+            path: string;
+            handler: HttpHandler;
+            options: HttpMiddlewareOptions;
+          }) => {
+            const middleware = this.createExpressHandler(handler.bind(controllerInstance));
+            if (options?.errorHandler) {
+              router.use(path, ((
+                err: any,
+                req: express.Request,
+                res: express.Response,
+                next: express.NextFunction,
+              ) => {
+                const ctx: HttpContext = {
+                  req: req as unknown as HttpReq,
+                  res: res as unknown as HttpRes,
+                  next,
+                  err,
+                };
+                handler.call(controllerInstance, ctx);
+              }) as express.ErrorRequestHandler);
             } else {
-              apiRouter['use'](finalPath, async (err: any, req: any, res: any, next: any) => {
-                try {
-                  await providerHandler({ err, req, res, next });
-                } catch (error) {
-                  next(error);
-                }
-              });
+              router.use(path, middleware);
             }
-          }
-        });
-      }
+          },
+        );
 
-      const middlewareOptions = Reflect.getMetadata('provider:middleware:options', provider);
+        // Apply routes
+        routes.forEach(
+          ({
+            method,
+            path,
+            handler,
+          }: {
+            method: HttpMethods;
+            path: string;
+            handler: HttpHandler;
+          }) => {
+            const routePath = [path];
 
-      if (middlewareOptions) {
-        classMethodNames.forEach((methodName) => {
-          const providerHandler: (ctx: HttpContext) => any =
-            classInstance[methodName].bind(classInstance);
+            router[method](routePath, this.createExpressHandler(handler.bind(controllerInstance)));
+          },
+        );
 
-          const httpMiddlewareOptions: HttpMiddlewareOptions = Reflect.getMetadata(
-            'http:middleware:options',
-            prototype,
-            methodName,
-          );
+        // Mount the router at the combined path
+        const basePath = [currentModulePath, controllerPath]
+          .filter((p) => p && p !== '/')
+          .join('/')
+          .replace(/\/+/g, '/');
 
-          const finalPath = this.parsePath(
-            `/${middlewareOptions?.prefix ?? ''}/${httpMiddlewareOptions?.path ?? ''}`,
-          );
+        this.expressApp?.use(basePath, router);
+      });
 
-          if (!httpMiddlewareOptions?.error) {
-            apiRouter['use'](finalPath, async (req, res, next) => {
-              try {
-                await providerHandler({ req, res, next });
-              } catch (error) {
-                next(error);
-              }
-            });
-          } else {
-            apiRouter['use'](finalPath, async (err: any, req: any, res: any, next: any) => {
-              try {
-                await providerHandler({ err, req, res, next });
-              } catch (error) {
-                next(error);
-              }
-            });
-          }
-        });
-      }
-    });
+      return controllers;
+    };
 
-    this.options.imports.forEach((module) => {
-      module.init();
-      const moduleExported = module.export();
-      this.router.use(this.options.prefix, moduleExported.router);
-    });
+    processModule(this);
 
-    this.router.use(this.options.prefix, apiRouter);
-    return this;
+    this.isInitialized = true;
   }
 
-  start(port: number, callback?: () => void) {
-    this.setup();
-    this.app?.listen(
-      port,
-      callback ??
-        (() => {
-          console.info(
-            `[${this?.constructor?.name ?? 'AppModule'}] Running on http://localhost:${port}`,
-          );
-        }),
-    );
+  async start(port: number, callback?: () => void) {
+    if (!this.isInitialized) await this.init();
+    this.expressApp?.listen(port, callback);
+  }
+
+  getExpressApp(): Application | undefined {
+    return this.expressApp;
   }
 }
